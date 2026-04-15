@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Star Wars: Victory Web Companion</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.cdnfonts.com/css/aurebesh" rel="stylesheet" />
+  <style>
+   * {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+    body {
+      font-family: 'Orbitron', sans-serif;
+      background: #000;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+      text-transform: uppercase;
+    }
+    .unit {
+      background: #222;
+      border: 2px solid #444;
+      border-radius: 10px;
+      padding: 10px;
+      margin: 10px;
+      display: inline-block;
+      width: 200px;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.3s ease;
+      position: relative;
+    }
+    .unit.selected {
+      border: 2px solid var(--selected-border-color);
+      box-shadow: 0 0 8px var(--selected-border-color);
+    }
+    .unit h3 {
+      margin: 0 0 10px;
+      color: #fff;
+      text-shadow: 0 0 #fff, 0 0 8px #aaa;
+    }
+    .hp {
+      font-size: 24px;
+      margin: 10px 0;
+      color: #fff;
+    }
+    .low-hp {
+      animation: pulse 1.5s infinite;
+      color: #b00020 !important;
+      font-weight: bold;
+    }
+    .hp-label {
+      font-size: 24px;
+      margin-right: 5px;
+      color: #fff;
+    }
+    .hp-wrapper {
+      display: inline-flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 6px;
+      margin: 10px 0;
+    }
+    .tooltip {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      position: absolute;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-top: 5px;
+      z-index: 10;
+    }
+    .tooltip.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .tooltip-wrapper:hover .tooltip {
+      opacity: 1;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    button {
+      padding: 5px 10px;
+      font-size: 16px;
+      margin: 0 5px;
+      background-color: #444;
+      color: #fff;
+      border: 2px solid #666;
+      border-radius: 5px;
+      cursor: pointer;
+      user-select: none;
+    }
+    button:hover {
+      background-color: #666;
+    }
+    #faction-select {
+      background-color: #222;
+      color: #fff;
+      border: 2px solid #444;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 16px;
+      appearance: none;
+      cursor: pointer;
+      box-shadow: 0 0 5px #000;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    #faction-select:focus {
+      border-color: white;
+      box-shadow: 0 0 8px white;
+      outline: none;
+    }
+    #faction-display {
+      text-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
+      letter-spacing: 0.15em;
+    }
+    .aurebesh {
+      font-family: 'Aurebesh', sans-serif;
+      font-size: 14px;
+      margin-top: 5px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <h1>Star Wars: Victory<br />Unit Tracker</h1>
+
+  <div style="margin: 20px 0;">
+    <label for="faction-select">Select Your Faction:</label><br />
+    <select id="faction-select" onchange="setFaction()" style="margin-top: 10px;">
+      <option value="">-- None Chosen --</option>
+      <option value="empire">Galactic Empire</option>
+      <option value="rebels">Rebel Alliance</option>
+    </select>
+  </div>
+
+  <h2 id="faction-display" style="margin-bottom: 30px;"></h2>
+
+  <div id="set-buttons" style="display: none;">
+    <button id="set-squadron-btn" onclick="setSquadron()">Set Squadron</button>
+    <button id="reset-squadron-btn" onclick="resetSquadron()" style="display:none; margin-left: 10px;">Reset Squadron</button>
+  </div>
+
+  <div id="available-units" style="display:none;">
+    <h2>Available Units</h2>
+    <div id="available-units-list"></div>
+  </div>
+
+  <div id="your-squadron" style="display: none; margin-top: 30px;">
+    <h2 id="your-squadron-heading">Your Squadron</h2>
+    <div id="squadron-list"></div>
+    <div id="empty-message" style="color:#888; margin-top:10px; display:none;">Your squadron is empty.</div>
+  </div>
+
+  <script>
+    const tooltips = {
+      "Assault": "Balanced infantry. Suited for general combat",
+      "Heavy": "Brute unit. Trades speed for high health",
+      "Support": "Passive healer. Fast-moving, low health",
+      "Specialist": "Excels in long-range attack",
+      "Airborne": "Agile unit with consistent damage",
+      "Enforcer": "Elite infantry for offense and resilience"
+    };
+
+    const factionSelect = document.getElementById('faction-select');
+    const factionDisplay = document.getElementById('faction-display');
+    const setSquadronBtn = document.getElementById('set-squadron-btn');
+    const resetSquadronBtn = document.getElementById('reset-squadron-btn');
+    const availableUnitsDiv = document.getElementById('available-units');
+    const availableUnitsList = document.getElementById('available-units-list');
+    const squadronList = document.getElementById('squadron-list');
+    const emptyMessage = document.getElementById('empty-message');
+    const setButtons = document.getElementById('set-buttons');
+    const yourSquadronSection = document.getElementById('your-squadron');
+
+    const units = [
+      { name: "Assault", hp: 3, baseHp: 3, selected: false },
+      { name: "Heavy", hp: 4, baseHp: 4, selected: false },
+      { name: "Support", hp: 2, baseHp: 2, selected: false },
+      { name: "Specialist", hp: 3, baseHp: 3, selected: false },
+      { name: "Airborne", hp: 3, baseHp: 3, selected: false },
+      { name: "Enforcer", hp: 4, baseHp: 4, selected: false }
+    ];
+
+    function getAurebeshName(name) {
+      if (name === 'Assault' || name === 'Assault') return 'ASSAULT';
+      return name.toUpperCase();
+    }
+
+    function renderAvailableUnits() {
+      availableUnitsList.innerHTML = '';
+      units.forEach((unit) => {
+        const unitDiv = document.createElement('div');
+        unitDiv.className = 'unit' + (unit.selected ? ' selected' : '');
+
+        const nameEl = document.createElement('h3');
+        nameEl.textContent = unit.name;
+
+        const aurebeshEl = document.createElement('div');
+        aurebeshEl.className = 'aurebesh';
+        aurebeshEl.textContent = getAurebeshName(unit.name);
+
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        tooltip.textContent = tooltips[unit.name] || '';
+
+        unitDiv.onclick = () => {
+          unit.selected = !unit.selected;
+          renderAvailableUnits();
+        };
+
+        unitDiv.addEventListener('mouseenter', () => tooltip.classList.add('visible'));
+        unitDiv.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+        unitDiv.addEventListener('touchstart', (e) => {
+          e.stopPropagation();
+          document.querySelectorAll('.tooltip.visible').forEach(t => t.classList.remove('visible'));
+          tooltip.classList.add('visible');
+        });
+
+        unitDiv.appendChild(nameEl);
+        unitDiv.appendChild(aurebeshEl);
+        unitDiv.appendChild(tooltip);
+
+        availableUnitsList.appendChild(unitDiv);
+      });
+
+      document.addEventListener('touchstart', () => {
+        document.querySelectorAll('.tooltip.visible').forEach(t => t.classList.remove('visible'));
+      });
+    }
+
+    function setFaction() {
+      const faction = factionSelect.value;
+      const root = document.documentElement;
+
+      if (faction === "empire") {
+        factionDisplay.textContent = "LONG LIVE THE EMPIRE!";
+        factionDisplay.style.color = "crimson";
+        root.style.setProperty('--selected-border-color', 'crimson');
+      } else if (faction === "rebels") {
+        factionDisplay.textContent = "FOR THE REBELLION!";
+        factionDisplay.style.color = "skyblue";
+        root.style.setProperty('--selected-border-color', 'skyblue');
+      } else {
+        factionDisplay.textContent = "";
+        availableUnitsDiv.style.display = "none";
+        setButtons.style.display = "none";
+        return;
+      }
+
+      availableUnitsDiv.style.display = "block";
+      setButtons.style.display = "block";
+      setSquadronBtn.style.display = "inline-block";
+      setSquadronBtn.disabled = false;
+      resetSquadronBtn.style.display = "none";
+      factionSelect.disabled = false;
+      yourSquadronSection.style.display = "none";
+      squadronList.innerHTML = "";
+      emptyMessage.style.display = "none";
+
+      units.forEach(u => {
+        u.selected = false;
+        u.hp = u.baseHp;
+      });
+
+      renderAvailableUnits();
+    }
+
+    function setSquadron() {
+      squadronList.innerHTML = '';
+      const selectedUnits = units.filter(u => u.selected);
+      yourSquadronSection.style.display = "block";
+      emptyMessage.style.display = selectedUnits.length === 0 ? "block" : "none";
+
+      selectedUnits.forEach((unit, idx) => {
+        const unitDiv = document.createElement('div');
+        unitDiv.className = 'unit';
+        unitDiv.innerHTML = `
+          <h3>${unit.name}</h3>
+          <div class="aurebesh">${getAurebeshName(unit.name)}</div>
+          <span class="hp-label ${unit.hp <= 1 ? 'low-hp' : ''}">HP:</span> 
+          <span id="hp-${idx}" class="hp ${unit.hp <= 1 ? 'low-hp' : ''}">${unit.hp}</span>
+          <br />
+          <button onclick="changeHP(${idx}, -1)">-</button>
+          <button onclick="changeHP(${idx}, 1)">+</button>
+        `;
+        squadronList.appendChild(unitDiv);
+      });
+
+      availableUnitsDiv.style.display = 'none';
+      factionSelect.disabled = true;
+      setSquadronBtn.style.display = 'none';
+      resetSquadronBtn.style.display = 'inline-block';
+    }
+
+    function resetSquadron() {
+      units.forEach(u => {
+        u.selected = false;
+        u.hp = u.baseHp;
+      });
+      squadronList.innerHTML = '';
+      emptyMessage.style.display = 'none';
+      availableUnitsDiv.style.display = 'block';
+      yourSquadronSection.style.display = 'none';
+      factionSelect.disabled = false;
+      setSquadronBtn.style.display = 'inline-block';
+      setButtons.style.display = 'block';
+      resetSquadronBtn.style.display = 'none';
+      renderAvailableUnits();
+    }
+
+    function changeHP(idx, amount) {
+      const selectedUnits = units.filter(u => u.selected);
+      const unit = selectedUnits[idx];
+      if (!unit) return;
+      unit.hp = Math.max(0, Math.min(unit.hp + amount, unit.baseHp));
+      const hpSpan = document.getElementById(`hp-${idx}`);
+      hpSpan.textContent = unit.hp;
+      const hpLabel = hpSpan.previousElementSibling;
+
+      if (unit.hp <= 1) {
+        hpSpan.classList.add('low-hp');
+        hpLabel.classList.add('low-hp');
+      } else {
+        hpSpan.classList.remove('low-hp');
+        hpLabel.classList.remove('low-hp');
+      }
+    }
+
+    // Initialize
+    renderAvailableUnits();
+  </script>
+</body>
+</html>
