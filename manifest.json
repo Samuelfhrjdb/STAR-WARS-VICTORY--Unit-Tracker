@@ -1,9 +1,9 @@
 {
-  "name": "My App",
-  "short_name": "App",
+  "name": "Star Wars Victory",
+  "short_name": "Victory",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#000000",
   "theme_color": "#000000",
   "icons": [
     {
